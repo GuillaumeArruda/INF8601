@@ -90,7 +90,7 @@ int dragon_draw_tbb(char **canvas, struct rgb *image, int width, int height, uin
 
 	init.terminate();
 	free_palette(palette);
-	//*canvas = dragon; // FIXME: retourner le dragon calculé
+	*canvas = dragon;
 	*canvas = NULL;
 	return 0;
 }
