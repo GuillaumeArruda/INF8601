@@ -24,7 +24,7 @@ libdragon_a-dragon.o: dragon.c /usr/include/stdc-predef.h \
  /usr/include/bits/stdio.h \
  /usr/lib/gcc/x86_64-redhat-linux/5.1.1/include/stdint.h \
  /usr/include/stdint.h /usr/include/bits/wchar.h /usr/include/inttypes.h \
- color.h
+ color.h utils.h
 
 /usr/include/stdc-predef.h:
 
@@ -129,3 +129,5 @@ dragon.h:
 /usr/include/inttypes.h:
 
 color.h:
+
+utils.h:

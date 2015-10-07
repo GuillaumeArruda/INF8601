@@ -8,6 +8,7 @@
 #include <iostream>
 
 extern "C" {
+#include "time.h"
 #include "dragon.h"
 #include "color.h"
 #include "utils.h"
@@ -15,9 +16,12 @@ extern "C" {
 #include "dragon_tbb.h"
 #include "tbb/tbb.h"
 #include "TidMap.h"
+#include <atomic>
 
 using namespace std;
 using namespace tbb;
+atomic_int numberOfInterval;
+static TidMap* tidMap = NULL;
 
 class DragonLimits {
 	public:
@@ -46,7 +50,8 @@ class DragonDraw {
 			mdata = dragon.mdata;
 		}
 		void operator()(const blocked_range<int>& range) const{
-			int indexBegin = ((range.begin() * mdata->nb_thread) / (mdata->size));
+			tidMap->getIdFromTid(gettid());
+			int indexBegin = ((range.begin() * mdata->nb_thread) / mdata->size);
 			int indexEnd = ((range.end() * mdata->nb_thread) / mdata->size);
 			if(indexBegin != indexEnd)
 			{
@@ -76,6 +81,7 @@ class DragonRender {
 			mdata = dragon.mdata;
 		}
 		void operator()(const blocked_range<int>& range) const{
+			numberOfInterval++;
 			scale_dragon(range.begin(),range.end(),mdata->image,mdata->image_width,mdata->image_height, mdata->dragon, mdata->dragon_width, mdata->dragon_height, mdata->palette);
 		}
 	struct draw_data* mdata;
@@ -100,6 +106,7 @@ class DragonClear {
 
 int dragon_draw_tbb(char **canvas, struct rgb *image, int width, int height, uint64_t size, int nb_thread)
 {
+	tidMap = new TidMap(nb_thread*2);
 	struct draw_data data;
 	limits_t limits;
 	char *dragon = NULL;
@@ -117,8 +124,11 @@ int dragon_draw_tbb(char **canvas, struct rgb *image, int width, int height, uin
 		return -1;
 
 	/* 1. Calculer les limites du dragon */
+	clock_t start = clock(), diff;
 	dragon_limits_tbb(&limits, size, nb_thread);
-
+	diff = clock() - start;
+	int msec = diff * 1000 / CLOCKS_PER_SEC;
+	cout << "Limit calcul time: " << msec << " milliseconds" << endl;
 	dragon_width = limits.maximums.x - limits.minimums.x;
 	dragon_height = limits.maximums.y - limits.minimums.y;
 	dragon_surface = dragon_width * dragon_height;
@@ -153,17 +163,31 @@ int dragon_draw_tbb(char **canvas, struct rgb *image, int width, int height, uin
 
 	/* 2. Initialiser la surface : DragonClear */
 	DragonClear dragonClear(-1,dragon);
+	start = clock();
 	parallel_for(blocked_range<int>(0,dragon_surface),dragonClear);
+	diff = clock() - start;
+	msec = diff * 1000 / CLOCKS_PER_SEC;
+	cout << "Clear calcul time: "<< msec << " milliseconds" << endl;
 	/* 3. Dessiner le dragon : DragonDraw */
 	DragonDraw dragonDraw(&data);
+	start = clock();
 	parallel_for(blocked_range<int>(0,data.size),dragonDraw);
+	diff = clock() - start;
+	msec = diff * 1000 / CLOCKS_PER_SEC;
+	cout << "Draw calcul time: "<< msec << " milliseconds" << endl;
 	/* 4. Effectuer le rendu final : DragonRender */
 	DragonRender dragonRender(&data);
+	start = clock();
 	parallel_for(blocked_range<int>(0,data.image_height),dragonRender);
-
+	diff = clock() - start;
+	msec = diff * 1000 / CLOCKS_PER_SEC;
+	cout << "Render calcul time: "<< msec << " milliseconds" << endl;
+	cout << "Number of interval: " << numberOfInterval << endl;
+	tidMap->dump();
 	init.terminate();
 	free_palette(palette);
 	*canvas = dragon;
+	delete tidMap;
 	return 0;
 }
 

@@ -15,6 +15,7 @@
 
 #include "dragon.h"
 #include "color.h"
+#include "utils.h"
 
 xy_t compute_position(int64_t i)
 {

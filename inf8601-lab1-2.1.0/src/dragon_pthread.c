@@ -10,10 +10,12 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <string.h>
+#include <time.h>
 
 #include "dragon.h"
 #include "color.h"
 #include "dragon_pthread.h"
+#include "utils.h"
 
 pthread_mutex_t mutex_stdout;
 
@@ -112,6 +114,7 @@ int dragon_draw_pthread(char **canvas, struct rgb *image, int width, int height,
 	info.palette = palette;
 	
 	/* 2. Lancement du calcul parallèle principal avec draw_dragon_worker */
+	clock_t start = clock(), diff;
 	int i = 0;
 	for (i = 0; i < nb_thread; ++i) {
 		data[i] = info;
@@ -127,7 +130,9 @@ int dragon_draw_pthread(char **canvas, struct rgb *image, int width, int height,
 		printf("barrier destroy error\n");
 		goto err;
 	}
-
+	diff = clock() - start;
+	int msec = diff * 1000 / CLOCKS_PER_SEC;
+	printf("Draw calcul time: %d milliseconds\n",msec);
 	done: FREE(data);
 	FREE(threads);
 	free_palette(palette);
@@ -142,6 +147,7 @@ int dragon_draw_pthread(char **canvas, struct rgb *image, int width, int height,
 void *dragon_limit_worker(void *data) {
 	struct limit_data *lim = (struct limit_data *) data;
 	piece_limit(lim->start, lim->end, &lim->piece);
+	printf_safe("Pthread id: %d \n", gettid());
 	return NULL;
 }
 
@@ -164,6 +170,7 @@ int dragon_limits_pthread(limits_t *limits, uint64_t size, int nb_thread) {
 		goto err;
 
 	/* 1. Lancement du calcul en parallèle avec dragon_limit_worker */
+	clock_t start = clock(), diff;
 	int i = 0;
 	for (i = 0; i < nb_thread; ++i) {
 		thread_data[i].id = i;
@@ -181,6 +188,9 @@ int dragon_limits_pthread(limits_t *limits, uint64_t size, int nb_thread) {
 	{
 		piece_merge(&master, thread_data[i].piece);
 	}
+	diff = clock() - start;
+	int msec = diff * 1000/CLOCKS_PER_SEC;
+	printf("Limit calcul time: %d milliseconds\n",msec);
 	done: FREE(threads);
 	FREE(thread_data);
 	*limits = master.limits;
