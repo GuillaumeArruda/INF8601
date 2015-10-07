@@ -46,8 +46,23 @@ class DragonDraw {
 			mdata = dragon.mdata;
 		}
 		void operator()(const blocked_range<int>& range) const{
-			int index = (((range.begin()) * mdata->nb_thread) / (mdata->size));
-			dragon_draw_raw(range.begin(),range.end(),mdata->dragon, mdata->dragon_width, mdata->dragon_height,mdata->limits, index);
+			int indexBegin = ((range.begin() * mdata->nb_thread) / (mdata->size));
+			int indexEnd = ((range.end() * mdata->nb_thread) / mdata->size);
+			if(indexBegin != indexEnd)
+			{
+				int begin1 = range.begin();
+				int end1 = (indexEnd * mdata->size / mdata->nb_thread) - 1;
+				int begin2 = end1 + 1;
+				int end2 = range.end();
+				dragon_draw_raw(begin1,end1,mdata->dragon, mdata->dragon_width, mdata->dragon_height,mdata->limits, indexBegin);
+				dragon_draw_raw(begin2,end2,mdata->dragon, mdata->dragon_width, mdata->dragon_height,mdata->limits, indexEnd);
+			}
+			else
+			{
+				dragon_draw_raw(range.begin(),range.end(),mdata->dragon, mdata->dragon_width, mdata->dragon_height,mdata->limits, indexBegin);
+			}
+			
+				
 		}
 		struct draw_data* mdata;
 };
