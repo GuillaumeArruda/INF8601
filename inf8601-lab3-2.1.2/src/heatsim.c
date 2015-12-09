@@ -256,10 +256,10 @@ int init_ctx(ctx_t *ctx, opts_t *opts) {
 			MPI_Cart_coords(ctx->comm2d, rank, DIM_2D, coords);	
 			grid_t *g = cart2d_get_grid(ctx->cart, coords[0], coords[1]);
 
-			MPI_Isend(&g->width, 1, MPI_INTEGER, rank, rank*4+0, ctx->comm2d, &req[(rank-1)*4 ]);
-			MPI_Isend(&g->height, 1, MPI_INTEGER, rank, rank*4+1, ctx->comm2d, &req[(rank-1)*4+1]);
-			MPI_Isend(&g->padding, 1, MPI_INTEGER, rank, rank*4+2, ctx->comm2d, &req[(rank-1)*4+2]);
-			MPI_Isend(g->dbl, g->pw * g->ph, MPI_DOUBLE, rank, rank*4+3, ctx->comm2d, &req[(rank-1)*4+3]);
+			MPI_Isend(&g->width, 1, MPI_INTEGER, rank, rank * 4 + 0, ctx->comm2d, &req[(rank-1)*4+0]);
+			MPI_Isend(&g->height, 1, MPI_INTEGER, rank, rank * 4 + 1, ctx->comm2d, &req[(rank-1)*4+1]);
+			MPI_Isend(&g->padding, 1, MPI_INTEGER, rank, rank * 4 + 2, ctx->comm2d, &req[(rank-1)*4+2]);
+			MPI_Isend(g->dbl, g->pw * g->ph, MPI_DOUBLE, rank, rank * 4 + 3, ctx->comm2d, &req[(rank-1)*4+3]);
 		}
 		MPI_Waitall(4 * (ctx->numprocs - 1), req, status);
 		MPI_Cart_coords(ctx->comm2d, ctx->rank, DIM_2D, coords);
@@ -276,19 +276,16 @@ int init_ctx(ctx_t *ctx, opts_t *opts) {
 		MPI_Irecv(&height, 1, MPI_INTEGER, 0, ctx->rank * 4 + 1, ctx->comm2d, &req[1]);
 		MPI_Irecv(&padding, 1, MPI_INTEGER, 0, ctx->rank * 4 + 2, ctx->comm2d, &req[2]);
 		MPI_Waitall(3, req, status);
-		
 		new_grid = make_grid(width, height, padding);
-		MPI_Irecv(new_grid->dbl, new_grid->pw*new_grid->ph, MPI_DOUBLE, 0, ctx->rank*4+3, ctx->comm2d, &req[0]);
+		MPI_Irecv(new_grid->dbl, new_grid->pw*new_grid->ph, MPI_DOUBLE, 0, ctx->rank * 4 + 3, ctx->comm2d, &req[0]);
 		MPI_Waitall(1, req, status);
-		
 	}
 
 
 	/* Utilisation temporaire de global_grid */
-	new_grid = ctx->global_grid;
-
 	if (new_grid == NULL)
 		goto err;
+	
 	/* set padding required for Runge-Kutta */
 	ctx->curr_grid = grid_padding(new_grid, 1);
 	ctx->next_grid = grid_padding(new_grid, 1);
@@ -339,12 +336,11 @@ void exchng2d(ctx_t *ctx) {
 	MPI_Comm comm = ctx->comm2d;
 	MPI_Request req[8];
 	MPI_Status status[8];
-
+	
 	MPI_Irecv(receiveNorthBuffer, width, MPI_DOUBLE, ctx->north_peer, 10, comm, &req[0]);
 	MPI_Irecv(receiveEastBuffer, 1, ctx->vector, ctx->east_peer, 11, comm, &req[1]);
 	MPI_Irecv(receiveSouthBuffer, width, MPI_DOUBLE, ctx->south_peer,12, comm, &req[2]);
 	MPI_Irecv(receiveWestBuffer, 1, ctx->vector, ctx->west_peer, 13, comm, &req[3]);
-
 
   	MPI_Isend(sendNorthbuffer, width, MPI_DOUBLE, ctx->north_peer,12, comm, &req[4]);
 	MPI_Isend(sendEastBuffer, 1, ctx->vector, ctx->east_peer, 13, comm, &req[5]);
@@ -352,17 +348,15 @@ void exchng2d(ctx_t *ctx) {
 	MPI_Isend(sendWestBuffer, 1, ctx->vector, ctx->west_peer,	11, comm, &req[7]);
 
 	MPI_Waitall(8, req, status);
-	
 }
 
 int gather_result(ctx_t *ctx, opts_t *opts) {
-	TODO("lab3");
+	//TODO("lab3");
 
 	int ret = 0;
 	grid_t *local_grid = grid_padding(ctx->next_grid, 0);
 	if (local_grid == NULL)
 		goto err;
-
 	/*
 	 * FIXME: transfer simulation results from all process to rank=0
 	 * use grid for this purpose
@@ -386,15 +380,16 @@ int gather_result(ctx_t *ctx, opts_t *opts) {
 	}
 	else
 	{
-		MPI_Isend(local_grid->dbl, local_grid->height* local_grid->width, MPI_DOUBLE, 0, 3, ctx->comm2d, &req[0]);
+		MPI_Isend(local_grid->dbl, local_grid->height * local_grid->width, MPI_DOUBLE, 0, 3, ctx->comm2d, req);
 		MPI_Waitall(1, req, status);
 	}
 	/* now we can merge all data blocks, reuse global_grid */
 	//cart2d_grid_merge(ctx->cart, ctx->global_grid);
 	/* temporairement copie de next_grid */
-	grid_copy(ctx->next_grid, ctx->global_grid);
-
-	done: free_grid(local_grid);
+	cart2d_grid_merge(ctx->cart, ctx->global_grid);
+	free(req);
+	free(status);
+	done:
 	return ret;
 	err: ret = -1;
 	goto done;
